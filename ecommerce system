@@ -1,0 +1,161 @@
+import java.util.*;
+
+interface Shippable {
+    String getName();
+    double getWeight();
+}
+
+class Product {
+    String name;
+    double price;
+    int quantity;
+    boolean isExpirable;
+    boolean requiresShipping;
+
+    public Product(String name, double price, int quantity, boolean isExpirable, boolean requiresShipping) {
+        this.name = name;
+        this.price = price;
+        this.quantity = quantity;
+        this.isExpirable = isExpirable;
+        this.requiresShipping = requiresShipping;
+    }
+
+    public boolean isExpired() {
+        return false; // You can enhance this logic as needed
+    }
+}
+
+class ShippableProduct extends Product implements Shippable {
+    double weight;
+
+    public ShippableProduct(String name, double price, int quantity, boolean isExpirable, double weight) {
+        super(name, price, quantity, isExpirable, true);
+        this.weight = weight;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public double getWeight() {
+        return weight;
+    }
+}
+
+class Customer {
+    String name;
+    double balance;
+
+    public Customer(String name, double balance) {
+        this.name = name;
+        this.balance = balance;
+    }
+}
+
+class CartItem {
+    Product product;
+    int quantity;
+
+    public CartItem(Product product, int quantity) {
+        this.product = product;
+        this.quantity = quantity;
+    }
+}
+
+class Cart {
+    List<CartItem> items = new ArrayList<>();
+
+    public void add(Product product, int quantity) {
+        if (quantity > product.quantity) {
+            throw new IllegalArgumentException("Not enough quantity available.");
+        }
+        items.add(new CartItem(product, quantity));
+    }
+
+    public List<CartItem> getItems() {
+        return items;
+    }
+
+    public boolean isEmpty() {
+        return items.isEmpty();
+    }
+}
+
+class ShippingService {
+    public static void ship(List<Shippable> items) {
+        System.out.println("** Shipment notice **");
+        double totalWeight = 0;
+        Map<String, Double> itemMap = new HashMap<>();
+
+        for (Shippable item : items) {
+            itemMap.put(item.getName(), itemMap.getOrDefault(item.getName(), 0.0) + item.getWeight());
+            totalWeight += item.getWeight();
+        }
+
+        itemMap.forEach((name, weight) -> {
+            System.out.printf("%s\t%.0fg\n", name, weight * 1000);
+        });
+
+        System.out.printf("Total package weight %.1fkg\n", totalWeight);
+    }
+}
+
+class Checkout {
+    public static void checkout(Customer customer, Cart cart) {
+        if (cart.isEmpty()) throw new IllegalStateException("Cart is empty");
+
+        double subtotal = 0;
+        double shipping = 0;
+        List<Shippable> toShip = new ArrayList<>();
+
+        for (CartItem item : cart.getItems()) {
+            Product product = item.product;
+            if (item.quantity > product.quantity) throw new IllegalStateException("Out of stock");
+            if (product.isExpirable && product.isExpired()) throw new IllegalStateException(product.name + " is expired");
+
+            subtotal += product.price * item.quantity;
+
+            if (product.requiresShipping && product instanceof Shippable) {
+                Shippable shippable = (Shippable) product;
+                for (int i = 0; i < item.quantity; i++) toShip.add(shippable);
+            }
+        }
+
+        shipping = toShip.isEmpty() ? 0 : 30; // fixed shipping cost
+        double total = subtotal + shipping;
+
+        if (customer.balance < total) throw new IllegalStateException("Insufficient balance");
+
+        customer.balance -= total;
+
+        if (!toShip.isEmpty()) ShippingService.ship(toShip);
+
+        System.out.println("\n** Checkout receipt **");
+        for (CartItem item : cart.getItems()) {
+            System.out.printf("%dx %s\t%.0f\n", item.quantity, item.product.name, item.product.price * item.quantity);
+        }
+        System.out.println("----------------------");
+        System.out.printf("Subtotal\t%.0f\n", subtotal);
+        System.out.printf("Shipping\t%.0f\n", shipping);
+        System.out.printf("Amount\t\t%.0f\n", total);
+        System.out.printf("Customer balance\t%.0f\n", customer.balance);
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        ShippableProduct cheese = new ShippableProduct("Cheese", 100, 5, true, 0.2);
+        ShippableProduct biscuits = new ShippableProduct("Biscuits", 150, 3, true, 0.7);
+        Product tv = new ShippableProduct("TV", 1000, 2, false, 5);
+        Product scratchCard = new Product("Scratch Card", 50, 10, false, false);
+
+        Customer customer = new Customer("Ahmed", 1000);
+
+        Cart cart = new Cart();
+        cart.add(cheese, 2);
+        cart.add(biscuits, 1);
+        cart.add(scratchCard, 1);
+
+        Checkout.checkout(customer, cart);
+    }
+}
